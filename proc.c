@@ -95,7 +95,10 @@ found:
   p->rtime = 0;
   p->iotime = 0;
 
-  cprintf("process %d has been created with time %d\n",p->pid,p->ctime);
+  p->priority = 60;
+  p->turn = 0;
+
+  cprintf("process %d has been created with priority %d\n",p->pid,p->priority);
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -374,6 +377,33 @@ int waitx(int *wtime, int *rtime)
 
 }
 
+int set_priority(int new_priority,int pid)
+{
+  acquire(&ptable.lock);
+  struct proc *p;
+  int flag = 0;
+  int old = -1;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if(p->pid == pid)
+    {
+      old = p->priority;
+      p->priority = new_priority;
+      flag = 1;
+      if(old != new_priority)p->turn = 0;
+      break;
+    }
+  }
+
+  release(&ptable.lock);
+  if(flag && (p->priority < old))
+  {
+    yield();
+  }
+
+  return (old);
+}
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -451,7 +481,7 @@ void scheduler(void)
         switchuvm(p);
         p->state = RUNNING;
 
-        cprintf("process %d has been picked with creation time %d \n",p->pid,p->ctime);
+        cprintf("process %d has been picked with priority %d \n",p->pid,p->priority);
 
 
         swtch(&(c->scheduler), p->context);
@@ -461,7 +491,53 @@ void scheduler(void)
         // It should have changed its p->state before coming back.
         c->proc = 0;
       }
-		
+
+    #else
+    #ifdef PBS
+
+      struct proc *minP = 0;
+
+      for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+      {
+        if(p->state != RUNNABLE)continue;
+
+        if(minP == 0)
+        {
+          minP = p;
+        }
+        else if(minP->priority > p->priority)
+        {
+          minP = p;
+        }
+        else if((minP->priority == p->priority) && (minP->turn > p->turn))
+        {
+            minP = p;
+        }
+      }
+
+      if (minP != 0 && minP->state == RUNNABLE)
+      {
+        
+        p = minP;
+
+
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+        minP->turn++;
+
+        cprintf("process %d has been picked with priority %d \n",p->pid,p->priority);
+
+
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }
+
+		#endif
 		#endif
 		#endif
 

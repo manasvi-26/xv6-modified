@@ -7,6 +7,7 @@ int exit(void) __attribute__((noreturn));
 int wait(void);
 
 int waitx(int *wtime, int *rtime);
+int set_priority(int new_priority,int pid);
 
 int pipe(int*);
 int write(int, const void*, int);
