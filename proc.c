@@ -122,7 +122,7 @@ found:
   for(int i=0;i<5;i++)p->all_ticks[i] = 0;
   #endif
 
-  cprintf("process %d has been created with time %d\n",p->pid,p->ctime);
+  //cprintf("process %d has been created with time %d\n",p->pid,p->ctime);
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -309,7 +309,7 @@ exit(void)
   curproc->state = ZOMBIE;
   curproc->etime = ticks;
 
-  cprintf("process %d has exited with end time%d\n",curproc->pid,curproc->etime);
+  //cprintf("process %d has exited with end time%d\n",curproc->pid,curproc->etime);
 
 
   sched();
@@ -410,11 +410,11 @@ int waitx(int *wtime, int *rtime)
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
   }
-
 }
 
 int set_priority(int new_priority,int pid)
 {
+  if(new_priority<0 || new_priority >100)return -1;
   acquire(&ptable.lock);
 
   struct proc *p;
@@ -430,7 +430,7 @@ int set_priority(int new_priority,int pid)
       break;
     }
   }
-
+  
   release(&ptable.lock);
   if(flag && (p->priority < old))
   {
@@ -512,7 +512,7 @@ void scheduler(void)
       {
         
         p = minP;
-        p->wtime += (ticks - p->enter);
+        
         c->proc = p;
         switchuvm(p);
         p->state = RUNNING;
@@ -603,7 +603,7 @@ void scheduler(void)
       {
         
         c->proc = p;
-        p->wtime +=(ticks - p->enter);
+        
       	
         switchuvm(p);
       	p->state = RUNNING;
@@ -772,11 +772,10 @@ kill(int pid)
       if(p->state == SLEEPING){
         p->state = RUNNABLE;
         p->enter = ticks;
-    
+        
         #ifdef MLFQ
         push(p->queue,p);
         #endif
-      
       }
       release(&ptable.lock);
       return 0;
@@ -814,7 +813,12 @@ int ps(void)
     int q = p->queue;
     int t[5];
     for(int i=0;i<5;i++)t[i] = p->all_ticks[i];
- 
+
+    #ifndef MLFQ
+    q = -1;
+    for(int i=0;i<5;i++)t[i] = -1;
+    #endif
+
     cprintf("%d\t%d",pid,priority);
 
     if(p->state == RUNNING)cprintf("\t\trunning \t");
@@ -917,7 +921,7 @@ void push(int q, struct proc *p)
   p->next = 0;
   p->queue = q;
   p->alloted = (1 << q);
-  p->ticks = 0;  // total time it gets to run on cpu
+  p->ticks = 0;  // time it gets to run on cpu in one quanta
 
   if(head[q] == 0)
   {
