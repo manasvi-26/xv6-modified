@@ -414,7 +414,6 @@ int waitx(int *wtime, int *rtime)
 
 int set_priority(int new_priority,int pid)
 {
-  if(new_priority<0 || new_priority >100)return -1;
   acquire(&ptable.lock);
 
   struct proc *p;
